@@ -1,7 +1,3 @@
-section .data
-
-ALL_ST  dd      10000
-
 section .bss
 
 dims    resd    2       ; ywmiary planszy
@@ -25,8 +21,8 @@ extern malloc
         
 
 start:
-        movss   [rel c_temp], dword xmm0  ; temperatura chłodnicy
-        movss   [rel weight], dword xmm1  ; waga symulacji
+        movss   [rel c_temp], xmm0  ; temperatura chłodnicy
+        movss   [rel weight], xmm1  ; waga symulacji
         mov     [rel dims], edi     ; przesuń szerokość do dims[rel 0]
         mov     [rel dims + 4], esi
         mov     [rel tab], rdx      ; wskaźnik do tablicy floatow
@@ -170,15 +166,11 @@ this_druga:
 step:
         push    rbx
         mov     r9, [rel tab]
-        mov     eax, [rel stepn]
-        cmp     eax, [ALL_ST]
-        jge     end_state
         mov     r8d, [rel size]
         test    r8d, r8d
         jz      end_state
         dec     r8d
 loop_step:
-        finit
         finit
         mov     eax, r8d
         call    this_val

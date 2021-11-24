@@ -21,10 +21,16 @@ void print_state(float *tab, int szer, int wys, int ktora) {
         printf("\n\n");
 }
 
-int main() {
-        FILE *file = fopen("data.txt", "r");
+int main(int argc, char** argv) {
+        if (argc < 4)
+                return 1;
+        FILE *file = fopen(argv[1], "r");
+        int steps;
+        float flux;
+        sscanf(argv[2], "%d", &steps);
+        sscanf(argv[3], "%f", &flux);
         if (file <= 0) {
-                dprintf(2, "Nie ma pliku data.txt!\n");
+                dprintf(2, "Nie ma pliku %s!\n", argv[1]);
                 return 1;
         }
         int width, height;
@@ -45,10 +51,10 @@ int main() {
                 fscanf(file, "%d %d %f", &x[i], &y[i], &temp[i]);
         }
         fclose(file);
-        start (width, height, matrix, C, 0.0001);
+        start (width, height, matrix, C, flux);
         place(g_num, x, y, temp);
         print_state(matrix,width, height, 0);
-        for (int i = 0; i < 10000; i++)
+        for (int i = 0; i < steps; i++)
                 step(i);
         return 0;
 
