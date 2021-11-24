@@ -35,7 +35,7 @@ start:
         mov     [rel stepn], eax      ; który to krok
         ret
 
-place:
+place:                          ;dla każdej tablicy (x, y, temp) alokuje pamiec (malloc) i kopiuje zawartosc (rep movsd)
         push    rsi             ;tablica x
         push    rdx             ;talibca y
         push    rcx             ; tablica temperatur
@@ -65,32 +65,32 @@ place:
         rep     movsd
         ret
 
-chlodnica:
+chlodnica:                      ; szukane pole to chlodnica, zwroc temperature przywracajac stos do stanu sprzed wywolania prosby o pole obok
         add     rsp, 8
         mov     ecx, [rel c_temp]
         ret
 
-left_temp:                      ;zaladowac aktualny numer do eax
-        push    rax
+left_temp:                      ;zaladowac aktualny numer pola do eax; funkcja zwraca temp. pola po lewej
+        push    rax             ; zapamietuje aktualne pole
         xor     edx, edx
         div     DWORD [rel dims]
-        test    edx, edx
-        jz      chlodnica
-        movzx   eax, BYTE [rel actual]
+        test    edx, edx        ; sprawdzam, czy jest w 1 kolumnie
+        jz      chlodnica       ;jesli tak zwracam stala c_temp
+        movzx   eax, BYTE [rel actual]  ;sprawdzam ktora polowa macierzy ma dane o aktualnym kroku
         test    eax, eax
-        jnz     left_druga
+        jnz     left_druga      ; trzeba pobrac dane z 2 polowy macierzy
         pop     rax
         dec     eax
-        mov     ecx, [r9 + 4 * rax]
+        mov     ecx, [r9 + 4 * rax]     ;pobieram pole po lewej z 1 polowy macierzy
         ret
 left_druga:
-        pop     rax
+        pop     rax     
         dec     eax
         add     eax, [rel size]  
-        mov     ecx, [r9 + 4 * rax]
+        mov     ecx, [r9 + 4 * rax]     ;pobieram pole po lewej z 2 polowy macierzy
         ret
 
-right_temp:                      ;zaladowac aktualny numer do eax
+right_temp:                      ;zaladowac aktualny numer do eax; analogicznie jak lewa, inne funkcje sprawdzające brzeg
         push    rax
         inc     eax
         xor     edx, edx
@@ -111,7 +111,7 @@ right_druga:
         mov     ecx, [r9 + 4 * rax]
         ret
 
-up_temp:
+up_temp:                ;analogiczne jak lewo/prawo, inne funkcje sprawdzające brzeg
         push    rax
         xor     edx, edx
         div     DWORD [rel dims]
@@ -131,7 +131,7 @@ up_druga:
         mov     ecx, [r9 + 4 * rax]
         ret
 
-down_temp:
+down_temp:              ;analogicznie jak pozostale
         push    rax
         xor     edx, edx
         div     DWORD [rel dims]
@@ -152,39 +152,39 @@ down_druga:
         mov     ecx, [r9 + 4 * rax]
         ret
 
-this_val:
+this_val:               ;pobierz temperaturę pola o numerze w rax
         movzx   ecx, byte [rel actual]
         test    ecx, ecx
         jnz     this_druga
-        mov     ecx, [r9 + 4 * rax]
+        mov     ecx, [r9 + 4 * rax]     ;1 polowa
         ret
-this_druga:      
+this_druga:                             ; 2 polowa
         add     eax, [rel size]
-        mov     ecx, [r9 + 4* rax]
+        mov     ecx, [r9 + 4* rax]      
         ret
 
 step:
         push    rbx
-        mov     r9, [rel tab]
-        mov     r8d, [rel size]
+        mov     r9, [rel tab]           ;zaladuj adres macierzy 
+        mov     r8d, [rel size]         ; zaladuj rozmiar macierzy
         test    r8d, r8d
         jz      end_state
         dec     r8d
 loop_step:
-        finit
+        finit                           ;inicjalizacja procesora fpu
         mov     eax, r8d
-        call    this_val
+        call    this_val                ;wynik w rcx
         push    rcx
-        fld     DWORD [rsp]
-        add     rsp, 8
+        fld     DWORD [rsp]             ;ładuje wynik na stos fpu
+        add     rsp, 8                  ;i usuwa ze stosu memory
         mov     eax, r8d
         call    left_temp
         push    rcx
-        fld     DWORD [rsp]
+        fld     DWORD [rsp]             ;laduje temperature po lewej na stos fpu
         fsub    st1
-        fstp    DWORD [rsp] ;podmiana wierzchołka stosu na różnicę z lewą
+        fstp    DWORD [rsp]             ;w pamieci podmiana temperatury lewej komorki na roznice
         mov     eax, r8d
-        call    right_temp
+        call    right_temp              ;dalej analogicznie jak dla lewej
         push    rcx
         fld     DWORD [rsp]
         fsub    st1
@@ -202,46 +202,46 @@ loop_step:
         fsub    st1
         fstp    DWORD [rsp]
         fldz
-        fadd    DWORD [rsp]
+        fadd    DWORD [rsp]             ;dodanie wyliczonych wczesniej roznic 
         fadd    DWORD [rsp + 8]
         fadd    DWORD [rsp + 16]
         fadd    DWORD [rsp + 24]
-        add     rsp, 32
-        fld     DWORD [rel weight]
+        add     rsp, 32                 ;porzadek w stosie
+        fld     DWORD [rel weight]      ;pomnozenie razy stala
         fmul    st1
         fadd    st2
-        movzx   ebx, byte [rel actual]
+        movzx   ebx, byte [rel actual]  ;sprawdzenie gdzie zapisac
         test    ebx, ebx
         jz      save_in_second
-        fstp    DWORD [r9 + 4 * r8]
+        fstp    DWORD [r9 + 4 * r8]     ;w pierwszej polowce macierzy
         jmp     end_save
-save_in_second:
+save_in_second:                         ; w drugiej polowce macierzy
         mov     ecx, [rel size]
         add     ecx, r8d
         fstp    DWORD [r9 + 4 * rcx]
 end_save:
-        dec     r8d
+        dec     r8d                     ;czy sa jeszcze komorki do obliczenia
         cmp     r8d, 0
         jnl     loop_step
-        mov     ebx, [rel g_num]
+        mov     ebx, [rel g_num]        ;podmien grzejniki na stala
         test    ebx, ebx
-        jz      zero_g
+        jz      zero_g                  ;chyba ze ich nie ma
         dec     ebx
 loop_g:
-        mov     r10, [rel gylist]
-        mov     eax, [r10 + 4*rbx]
+        mov     r10, [rel gylist]       ;zaladuj do pamieci odpowiednia listy, policz (y*width+x)
+        mov     eax, [r10 + 4*rbx]      
         mov     edi, [rel dims]
         imul    edi
         mov     r10, [rel gxlist]
-        add     eax, [r10 + 4*rbx]
-        movzx   edx, byte [rel actual]
+        add     eax, [r10 + 4*rbx]      ;numer komorki z grzejnikiem do eax
+        movzx   edx, byte [rel actual]  ;sprawdz polowke
         mov     r10, [rel gtlist]
-        mov     ecx, [r10 + 4*rbx]
+        mov     ecx, [r10 + 4*rbx]      ;temperatura do podmiany
         test    edx, edx
         jz      save_g_in_sec
-        mov     [r9 + 4*rax], ecx
+        mov     [r9 + 4*rax], ecx       ;zapisz temperature do odpowiedniej komorki pamieci
         jmp     end_save_g
-save_g_in_sec:
+save_g_in_sec:                          ;w 2 polowie macierzy
         mov     esi, [rel size]
         add     esi, eax
         mov     [r9 + 4*rsi], ecx
@@ -250,16 +250,16 @@ end_save_g:
         cmp     ebx, 0
         jnl     loop_g
 zero_g:
-        inc     DWORD [rel stepn]
-        lea     rdi, [r9]
-        mov     esi, [rel dims]
+        inc     DWORD [rel stepn]       ;na koniec: zwieksz numer kroku
+        lea     rdi, [r9]               ; zaladuj adres macierzy 
+        mov     esi, [rel dims]         ;zaladuj wymiary 
         mov     edx, [rel dims+0x4]
-        inc     byte [rel actual]
+        inc     byte [rel actual]       ;zmiana numeru polowki
         and     byte [rel actual], 1
-        movzx   ecx, byte [rel actual]
-        call    print_state
+        movzx   ecx, byte [rel actual]  
+        call    print_state             ;wypisanie stanu
 end_state:
-        pop     rbx
+        pop     rbx                     ;koniec: przywroc rbx <abi>
         ret
 
 
